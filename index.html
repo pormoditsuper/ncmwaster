@@ -797,22 +797,6 @@ textarea.form-input { font-family: 'Sarabun', sans-serif; }
       <div><strong>หมายเหตุ:</strong> บริษัท นิวโชคอำนวยเชียงใหม่ จำกัด <font style="color:red;">ข้อมูลการติดต่อ</font>โทรศัพท์
 0816949845 | ดำเนินกิจการเกี่ยวกับการเก็บ ขนและกำจัดของเสียทางการแพทย์ เขตภาคเหนือ</div>
     </div>
-
-    <div class="admin-box" id="webapp-config-box">
-      <div class="admin-label">
-        <strong>ตั้งค่าเชื่อมต่อ Google Apps Script</strong>
-        วาง URL ของ Web App ที่ Deploy แล้ว (Execute as: Me, Who has access: Anyone) — จำเป็นเมื่อรันจาก GitHub Pages
-      </div>
-      <input type="url" id="webapp-url-input" class="form-input" placeholder="https://script.google.com/macros/s/XXXX/exec" style="flex:1;min-width:220px;max-width:420px;">
-      <button class="btn btn-primary btn-sm" onclick="saveWebAppUrlFromInput()"><i class='bx bx-link'></i> บันทึก URL</button>
-      <button class="btn btn-outline btn-sm" onclick="testWebAppConnection()"><i class='bx bx-check-shield'></i> ทดสอบ</button>
-    </div>
-
-    <div class="admin-box">
-      <div class="admin-label"><strong>ข้อมูลตัวอย่างสำหรับสาธิต</strong>เพิ่มข้อมูลตัวอย่างอย่างละ 5 รายการลงทุกชีต เพื่อทดสอบแดชบอร์ด — แถวตัวอย่างมีรหัสขึ้นต้นด้วย "SAMPLE-"</div>
-      <button class="btn btn-outline btn-sm" onclick="seedSampleData()"><i class='bx bx-data'></i> เพิ่มข้อมูลตัวอย่าง</button>
-      <button class="btn btn-red btn-sm" onclick="clearSampleData()"><i class='bx bx-trash'></i> ลบข้อมูลตัวอย่างทั้งหมด</button>
-    </div>
   </div>
 </div>
 
@@ -1901,7 +1885,7 @@ function updateConnBadge() {
     el.style.background = 'rgba(34,197,94,.25)';
     el.style.color = '#bbf7d0';
   } else if (getWebAppUrl()) {
-    el.textContent = '● GitHub + /exec';
+    // el.textContent = '● GitHub + /exec';
     el.style.background = 'rgba(79,70,229,.3)';
     el.style.color = '#c7d2fe';
   } else {
