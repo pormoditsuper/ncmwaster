@@ -1651,71 +1651,134 @@ function closeAllSidebars() {
 }
 
 /* ══════════════════════════════════════════════
-   API BRIDGE
-   • Inside Apps Script Web App  → google.script.run.processRequest
-   • On GitHub Pages (static)    → fetch() POST to the deployed Web App URL
-     (Content-Type: text/plain to avoid CORS preflight — see code.gs doPost)
-   Set the Web App URL once via localStorage key NCM_WEB_APP_URL
-   or by calling setWebAppUrl() from the browser console / settings UI.
+   API BRIDGE — รองรับ 3 โหมด
+   1) เปิดจาก Apps Script /exec          → google.script.run (ดีที่สุด)
+   2) เปิดจาก GitHub Pages + ตั้ง /exec   → iframe form POST + postMessage
+      (เลี่ยง CORS ได้ รองรับอัปโหลดรูป base64 ขนาดใหญ่)
+   3) ยังไม่ตั้ง URL                      → โหมดสาธิต (ไม่บันทึกจริง)
+
+   วาง DEFAULT_WEB_APP_URL ด้านล่างได้เลย จะถูกใช้ถ้า localStorage ว่าง
 ══════════════════════════════════════════════ */
+
+// ★ วาง URL /exec ของคุณที่นี่ (ทางเลือก — หรือตั้งผ่าน UI ก็ได้)
+const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyvvY8uNXzUP1PIytogKu3DYZZZI6jtEZT9G69dzsutIgDppT_m0MVxy2mz6hq3aIbm/exec';
+
 const WEB_APP_URL_STORAGE_KEY = 'NCM_WEB_APP_URL';
+const API_TIMEOUT_MS = 90000;
 
 function getWebAppUrl() {
-  return localStorage.getItem(WEB_APP_URL_STORAGE_KEY) || '';
+  return (localStorage.getItem(WEB_APP_URL_STORAGE_KEY) || DEFAULT_WEB_APP_URL || '').trim();
 }
 
 function setWebAppUrl(url) {
   if (!url) { localStorage.removeItem(WEB_APP_URL_STORAGE_KEY); return; }
   localStorage.setItem(WEB_APP_URL_STORAGE_KEY, url.trim());
   toast('บันทึก Web App URL แล้ว', 'success');
+  updateConnBadge();
+}
+
+function isAppsScriptHost() {
+  return typeof google !== 'undefined' && google.script && google.script.run;
 }
 
 function api(action, data = {}) {
+  // 1) อยู่บน Apps Script เอง
+  if (isAppsScriptHost()) {
+    return apiViaGoogleScript_(action, data);
+  }
+  // 2) GitHub Pages / โดเมนอื่น → iframe POST (ไม่ติด CORS)
+  const url = getWebAppUrl();
+  if (!url) {
+    return Promise.resolve(demoFallback_(action, data));
+  }
+  return apiViaIframe_(url, action, data);
+}
+
+function apiViaGoogleScript_(action, data) {
   return new Promise((res, rej) => {
-    // 1) Running inside Apps Script HtmlService
-    if (typeof google !== 'undefined' && google.script && google.script.run) {
-      google.script.run
-        .withSuccessHandler(r => {
-          try {
-            const parsed = typeof r === 'string' ? JSON.parse(r) : r;
-            if (!parsed.ok) { rej(new Error(parsed.error || 'Unknown server error')); return; }
-            res(parsed);
-          } catch (e) { rej(e); }
-        })
-        .withFailureHandler(e => rej(e))
-        .processRequest(JSON.stringify({ action, data }));
-      return;
-    }
-
-    // 2) GitHub Pages / external host → POST to deployed Web App
-    const url = getWebAppUrl();
-    if (!url) {
-      // Demo fallback so UI still works offline / before URL is configured
-      setTimeout(() => res(demoFallback_(action, data)), 250);
-      return;
-    }
-
-    fetch(url, {
-      method: 'POST',
-      // text/plain is a "simple" content-type → no CORS preflight
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, data })
-    })
-      .then(r => r.json())
-      .then(parsed => {
-        if (!parsed.ok) { rej(new Error(parsed.error || 'Unknown server error')); return; }
-        res(parsed);
+    google.script.run
+      .withSuccessHandler(r => {
+        try {
+          const parsed = typeof r === 'string' ? JSON.parse(r) : r;
+          if (!parsed.ok) { rej(new Error(parsed.error || 'Unknown server error')); return; }
+          res(parsed);
+        } catch (e) { rej(e); }
       })
-      .catch(e => rej(e));
+      .withFailureHandler(e => rej(e))
+      .processRequest(JSON.stringify({ action, data }));
+  });
+}
+
+/** iframe + form POST + postMessage — ใช้ได้จาก GitHub Pages โดยไม่ติด CORS */
+function apiViaIframe_(webAppUrl, action, data) {
+  return new Promise((res, rej) => {
+    const ncmId = 'ncm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
+    let settled = false;
+
+    const cleanup = () => {
+      window.removeEventListener('message', onMsg);
+      try { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (_) {}
+      try { if (form.parentNode) form.parentNode.removeChild(form); } catch (_) {}
+    };
+
+    const finish = (fn, val) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      cleanup();
+      fn(val);
+    };
+
+    const onMsg = (event) => {
+      const msg = event.data;
+      if (!msg || msg.ncmId !== ncmId) return;
+      if (msg.ok) finish(res, { ok: true, result: msg.result });
+      else finish(rej, new Error(msg.error || 'Server error'));
+    };
+
+    window.addEventListener('message', onMsg);
+
+    const iframe = document.createElement('iframe');
+    iframe.name = ncmId;
+    iframe.id = ncmId;
+    iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;left:-9999px;';
+    // sandbox ต้องมี allow-scripts + allow-same-origin เพื่อให้ postMessage จาก GAS ทำงาน
+    iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-same-origin');
+    document.body.appendChild(iframe);
+
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = webAppUrl;
+    form.target = ncmId;
+    form.style.display = 'none';
+    form.acceptCharset = 'UTF-8';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify({ action, data, ncmId });
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    const timer = setTimeout(() => {
+      finish(rej, new Error('หมดเวลาเชื่อมต่อ Apps Script (90 วินาที) — ตรวจ URL /exec และการ Deploy'));
+    }, API_TIMEOUT_MS);
+
+    try {
+      form.submit();
+    } catch (e) {
+      finish(rej, e);
+    }
   });
 }
 
 function demoFallback_(action, data) {
-  if (action.indexOf('get') === 0) return { ok: true, result: [] };
+  if (String(action).indexOf('get') === 0) return { ok: true, result: [] };
   if (action === 'seedSampleData') return { ok: true, result: { message: 'โหมดสาธิต — ยังไม่ได้ตั้งค่า Web App URL' } };
   if (action === 'clearSampleData') return { ok: true, result: { message: 'โหมดสาธิต — ยังไม่ได้ตั้งค่า Web App URL' } };
   if (action === 'uploadPhoto') return { ok: true, result: { url: '', error: 'โหมดสาธิต — ไม่สามารถอัปโหลดรูปได้' } };
-  return { ok: true, result: { id: 'DEMO-' + Date.now() } };
+  if (action === 'initSheets') return { ok: true, result: { message: 'โหมดสาธิต' } };
+  return { ok: true, result: { id: 'DEMO-' + Date.now(), _demo: true } };
 }
 
 function saveWebAppUrlFromInput() {
@@ -1735,15 +1798,19 @@ function saveWebAppUrlFromInput() {
 
 async function testWebAppConnection() {
   const url = getWebAppUrl();
-  if (!url) {
+  if (!url && !isAppsScriptHost()) {
     toast('ยังไม่ได้ตั้งค่า Web App URL', 'warn');
     return;
   }
   showLoader();
   try {
-    // Lightweight action that always exists
     const res = await api('initSheets', {});
-    toast('เชื่อมต่อสำเร็จ — ' + (res.result?.message || 'OK'), 'success');
+    if (res.result && res.result._demo) {
+      toast('ยังเป็นโหมดสาธิต — ตั้งค่า URL /exec ก่อน', 'warn');
+    } else {
+      toast('เชื่อมต่อสำเร็จ — ' + (res.result?.message || 'OK'), 'success');
+    }
+    updateConnBadge();
   } catch (e) {
     toast('เชื่อมต่อไม่สำเร็จ: ' + e.message, 'error');
   } finally {
@@ -1754,6 +1821,34 @@ async function testWebAppConnection() {
 function restoreWebAppUrlInput() {
   const input = document.getElementById('webapp-url-input');
   if (input) input.value = getWebAppUrl() || '';
+  updateConnBadge();
+}
+
+function updateConnBadge() {
+  let el = document.getElementById('conn-mode-badge');
+  if (!el) {
+    const top = document.querySelector('.select-topbar');
+    if (!top) return;
+    el = document.createElement('div');
+    el.id = 'conn-mode-badge';
+    el.style.cssText = 'font-size:11px;padding:5px 12px;border-radius:20px;font-weight:600;margin-left:8px;';
+    const pill = document.getElementById('emergency-contact-btn');
+    if (pill && pill.parentNode) pill.parentNode.insertBefore(el, pill);
+    else top.appendChild(el);
+  }
+  if (isAppsScriptHost()) {
+    el.textContent = '● โหมด Apps Script';
+    el.style.background = 'rgba(34,197,94,.25)';
+    el.style.color = '#bbf7d0';
+  } else if (getWebAppUrl()) {
+    el.textContent = '● GitHub + /exec';
+    el.style.background = 'rgba(79,70,229,.3)';
+    el.style.color = '#c7d2fe';
+  } else {
+    el.textContent = '● โหมดสาธิต';
+    el.style.background = 'rgba(245,158,11,.3)';
+    el.style.color = '#fde68a';
+  }
 }
 
 /* Screen & Pane navigation */
