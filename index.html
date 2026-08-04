@@ -1661,7 +1661,7 @@ function closeAllSidebars() {
 ══════════════════════════════════════════════ */
 
 // ★ วาง URL /exec ของคุณที่นี่ (ทางเลือก — หรือตั้งผ่าน UI ก็ได้)
-const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbyvvY8uNXzUP1PIytogKu3DYZZZI6jtEZT9G69dzsutIgDppT_m0MVxy2mz6hq3aIbm/exec';
+const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzA8zXOItoPIQPyMvCk-d6d968QzfwhWZTNMPNossbOZzGXUpGQ_zo0x1heFBE8K3miDA/exec';
 
 const WEB_APP_URL_STORAGE_KEY = 'NCM_WEB_APP_URL';
 const API_TIMEOUT_MS = 90000;
@@ -1714,9 +1714,12 @@ function apiViaIframe_(webAppUrl, action, data) {
   return new Promise((res, rej) => {
     const ncmId = 'ncm_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9);
     let settled = false;
+    let pollTimer = null;
+    let pollCount = 0;
 
     const cleanup = () => {
       window.removeEventListener('message', onMsg);
+      if (pollTimer) clearInterval(pollTimer);
       try { if (iframe.parentNode) iframe.parentNode.removeChild(iframe); } catch (_) {}
       try { if (form.parentNode) form.parentNode.removeChild(form); } catch (_) {}
     };
@@ -1731,18 +1734,41 @@ function apiViaIframe_(webAppUrl, action, data) {
 
     const onMsg = (event) => {
       const msg = event.data;
-      if (!msg || msg.ncmId !== ncmId) return;
+      if (!msg || typeof msg !== 'object' || msg.ncmId !== ncmId) return;
       if (msg.ok) finish(res, { ok: true, result: msg.result });
       else finish(rej, new Error(msg.error || 'Server error'));
     };
-
     window.addEventListener('message', onMsg);
+
+    // โพลล์ผลจาก CacheService ผ่าน JSONP (สำรองเมื่อ postMessage ไม่ถึง)
+    const startPolling = () => {
+      pollTimer = setInterval(() => {
+        if (settled) return;
+        pollCount++;
+        if (pollCount > 70) return;
+        apiViaJsonp_(webAppUrl, 'pollResult', { id: ncmId })
+          .then(parsed => {
+            const r = parsed && parsed.result;
+            if (!r || r.pending) return;
+            if (r.ok === false) {
+              finish(rej, new Error(r.error || 'Server error'));
+              return;
+            }
+            // cache เก็บทั้ง { ok, result, ncmId }
+            if (r.ok === true && r.result !== undefined) {
+              finish(res, { ok: true, result: r.result });
+              return;
+            }
+            finish(res, { ok: true, result: r });
+          })
+          .catch(() => {});
+      }, 1000);
+    };
 
     const iframe = document.createElement('iframe');
     iframe.name = ncmId;
     iframe.id = ncmId;
     iframe.style.cssText = 'position:absolute;width:0;height:0;border:0;left:-9999px;';
-    // sandbox ต้องมี allow-scripts + allow-same-origin เพื่อให้ postMessage จาก GAS ทำงาน
     iframe.setAttribute('sandbox', 'allow-scripts allow-forms allow-same-origin');
     document.body.appendChild(iframe);
 
@@ -1761,14 +1787,48 @@ function apiViaIframe_(webAppUrl, action, data) {
     document.body.appendChild(form);
 
     const timer = setTimeout(() => {
-      finish(rej, new Error('หมดเวลาเชื่อมต่อ Apps Script (90 วินาที) — ตรวจ URL /exec และการ Deploy'));
+      finish(rej, new Error('หมดเวลาเชื่อมต่อ Apps Script — Deploy เวอร์ชันล่าสุดแล้วหรือยัง?'));
     }, API_TIMEOUT_MS);
 
     try {
       form.submit();
+      // เริ่มโพลล์หลัง 1.2 วินาที ให้ server มีเวลาเขียน cache
+      setTimeout(startPolling, 1200);
     } catch (e) {
       finish(rej, e);
     }
+  });
+}
+
+/** JSONP ผ่าน doGet — โพลล์ผล / เรียก action ขนาดเล็ก ข้าม CORS ได้ */
+function apiViaJsonp_(webAppUrl, action, data) {
+  return new Promise((res, rej) => {
+    const cb = 'ncm_cb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+    let done = false;
+    const cleanup = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(t);
+      try { delete window[cb]; } catch (_) { window[cb] = undefined; }
+      try { if (script.parentNode) script.parentNode.removeChild(script); } catch (_) {}
+    };
+    const t = setTimeout(() => { cleanup(); rej(new Error('JSONP timeout')); }, 20000);
+
+    window[cb] = (parsed) => {
+      cleanup();
+      if (!parsed || !parsed.ok) rej(new Error((parsed && parsed.error) || 'JSONP error'));
+      else res(parsed);
+    };
+
+    const script = document.createElement('script');
+    const q = new URLSearchParams({
+      action: action,
+      data: JSON.stringify(data || {}),
+      callback: cb
+    });
+    script.src = webAppUrl + (webAppUrl.indexOf('?') >= 0 ? '&' : '?') + q.toString();
+    script.onerror = () => { cleanup(); rej(new Error('JSONP network error')); };
+    document.body.appendChild(script);
   });
 }
 
