@@ -119,24 +119,144 @@ body {
 .select-topbar {
   background: linear-gradient(135deg, rgba(30,27,75,.65) 0%, rgba(67,56,202,.55) 60%, rgba(124,58,237,.55) 100%);
   backdrop-filter: blur(10px);
-  color: #fff; padding: 22px 32px;
-  display: flex; justify-content: space-between; align-items: center;
+  color: #fff;
+  padding: 14px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
   box-shadow: 0 8px 28px rgba(30,27,75,.35);
   border-bottom: 1px solid rgba(255,255,255,.10);
 }
-.select-topbar .co { font-family:'Kanit',sans-serif; font-weight: 700; font-size: 16px; letter-spacing: .2px; }
-.select-topbar .co-sub { font-size: 12px; opacity: .75; margin-top: 3px; }
+.select-topbar .company-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;          /* อนุญาตให้ข้อความหดได้ */
+  flex: 1 1 auto;
+}
+.select-topbar .company-logo {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  flex-shrink: 0;
+  border-radius: 12px;
+  background: rgba(255,255,255,.12);
+  padding: 4px;
+}
+.select-topbar .company-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;          /* text-overflow ทำงานได้ */
+  gap: 2px;
+}
+.select-topbar .co {
+  font-family: 'Kanit', sans-serif;
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: .15px;
+  line-height: 1.25;
+  color: #fff;
+  /* ตัดบรรทัดสวย ไม่ล้น */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.select-topbar .co-sub {
+  font-family: 'Sarabun', sans-serif;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: #fde68a;
+  line-height: 1.4;
+  opacity: .95;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.select-topbar .co-sub .co-sub-full { display: inline; }
+.select-topbar .co-sub .co-sub-short { display: none; }
+
 .proto-pill-top {
-  background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.24);
-  border-radius: 20px; padding: 6px 16px; font-size: 12px;
-  font-family: 'IBM Plex Mono', monospace; letter-spacing: .8px;
+  background: rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.24);
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 12.5px;
+  font-family: 'Sarabun', sans-serif;
+  font-weight: 600;
+  letter-spacing: .2px;
   backdrop-filter: blur(6px);
   transition: background .18s, transform .18s, box-shadow .18s;
+  flex-shrink: 0;
+  white-space: nowrap;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
+.proto-pill-top i { font-size: 16px; }
 .proto-pill-top:hover {
   background: rgba(255,255,255,.26);
   transform: translateY(-1px);
   box-shadow: 0 6px 16px rgba(15,23,42,.30);
+}
+
+/* ── Topbar responsive ── */
+@media (max-width: 720px) {
+  .select-topbar {
+    padding: 12px 16px;
+    gap: 10px;
+  }
+  .select-topbar .company-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+  .select-topbar .co {
+    font-size: 14.5px;
+    -webkit-line-clamp: 2;
+  }
+  .select-topbar .co-sub {
+    font-size: 11.5px;
+    -webkit-line-clamp: 1;
+  }
+  .select-topbar .co-sub .co-sub-full { display: none; }
+  .select-topbar .co-sub .co-sub-short { display: inline; }
+  .proto-pill-top {
+    padding: 7px 12px;
+    font-size: 12px;
+  }
+}
+@media (max-width: 480px) {
+  .select-topbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px 14px;
+  }
+  .select-topbar .company-header {
+    width: 100%;
+  }
+  .select-topbar .company-logo {
+    width: 40px;
+    height: 40px;
+  }
+  .select-topbar .co {
+    font-size: 13.5px;
+  }
+  /* ซ่อนคำโปรยบนจอ ≤480px — เหลือแค่ชื่อบริษัท */
+  .select-topbar .co-sub {
+    display: none;
+  }
+  .proto-pill-top {
+    width: 100%;
+    justify-content: center;
+    border-radius: 12px;
+    padding: 10px 14px;
+  }
 }
 .role-select-wrap {
   max-width: 1040px; margin: 0 auto; padding: 54px 28px 80px;
@@ -691,36 +811,8 @@ textarea.form-input { font-family: 'Sarabun', sans-serif; }
   #role-sidebar-overlay { display: none !important; }
 }
 
-.company-header{
-    display:flex;
-    align-items:center;
-    gap:16px;
-}
-
-.company-logo{
-    width:70px;
-    height:70px;
-    object-fit:contain;
-    flex-shrink:0;
-}
-
-.company-text{
-    display:flex;
-    flex-direction:column;
-}
-
-.co{
-    font-size:28px;
-    font-weight:700;
-    line-height:1.2;
-}
-
-.co-sub{
-    font-size:15px;
-    color:#fdd835;
-    line-height:1.45;
-    margin-top:4px;
-}
+/* company-header / logo / text ถูกกำหนดภายใต้ .select-topbar แล้ว
+   (ไม่ใช้ global .co ขนาด 28px ที่ทำให้ชื่อล้นบนมือถือ) */
 </style>
 </head>
 <body>
@@ -742,20 +834,22 @@ textarea.form-input { font-family: 'Sarabun', sans-serif; }
 ════════════════════════════════════════════ -->
 <div class="screen active" id="screen-select">
   <div class="select-topbar">
-   <div class="company-header">
-    <img class="company-logo"
-         src="https://lh3.googleusercontent.com/d/1ekM9DNmwLOQyYvcMfrsQsYZ-5gJaSzAD"
-         alt="NCM Logo">
-
-    <div class="company-text">
+    <div class="company-header">
+      <img class="company-logo"
+           src="https://lh3.googleusercontent.com/d/1ekM9DNmwLOQyYvcMfrsQsYZ-5gJaSzAD"
+           alt="NCM Logo">
+      <div class="company-text">
         <div class="co">บริษัท นิวโชคอำนวย เชียงใหม่ จำกัด</div>
         <div class="co-sub">
-            ระบบบริหารจัดการมูลฝอยติดเชื้อร่วมโรงพยาบาล
-            (Hospital ⇄ NCM Waste Platform)
+          <span class="co-sub-full">ระบบบริหารจัดการมูลฝอยติดเชื้อร่วมโรงพยาบาล (Hospital ⇄ NCM Waste Platform)</span>
+          <span class="co-sub-short">NCM Waste Platform · มูลฝอยติดเชื้อ</span>
         </div>
+      </div>
     </div>
-</div>
-    <div class="proto-pill-top mono" id="emergency-contact-btn" onclick="openContactModal()" style="cursor:pointer;display:flex;align-items:center;gap:7px;"><i class='bx bx-phone-call'></i> ติดต่อฉุกเฉิน</div>
+    <button type="button" class="proto-pill-top" id="emergency-contact-btn" onclick="openContactModal()" aria-label="ติดต่อฉุกเฉิน">
+      <i class='bx bx-phone-call'></i>
+      <span>ติดต่อฉุกเฉิน</span>
+    </button>
   </div>
   <div class="role-select-wrap">
     <h1>เข้าสู่ระบบในบทบาทของท่าน</h1>
@@ -797,6 +891,22 @@ textarea.form-input { font-family: 'Sarabun', sans-serif; }
       <div><strong>หมายเหตุ:</strong> บริษัท นิวโชคอำนวยเชียงใหม่ จำกัด <font style="color:red;">ข้อมูลการติดต่อ</font>โทรศัพท์
 0816949845 | ดำเนินกิจการเกี่ยวกับการเก็บ ขนและกำจัดของเสียทางการแพทย์ เขตภาคเหนือ</div>
     </div>
+
+    <!-- <div class="admin-box" id="webapp-config-box">
+      <div class="admin-label">
+        <strong>ตั้งค่าเชื่อมต่อ Google Apps Script</strong>
+        วาง URL ของ Web App ที่ Deploy แล้ว (Execute as: Me, Who has access: Anyone) — จำเป็นเมื่อรันจาก GitHub Pages
+      </div>
+      <input type="url" id="webapp-url-input" class="form-input" placeholder="https://script.google.com/macros/s/XXXX/exec" style="flex:1;min-width:220px;max-width:420px;">
+      <button class="btn btn-primary btn-sm" onclick="saveWebAppUrlFromInput()"><i class='bx bx-link'></i> บันทึก URL</button>
+      <button class="btn btn-outline btn-sm" onclick="testWebAppConnection()"><i class='bx bx-check-shield'></i> ทดสอบ</button>
+    </div>
+
+    <div class="admin-box">
+      <div class="admin-label"><strong>ข้อมูลตัวอย่างสำหรับสาธิต</strong>เพิ่มข้อมูลตัวอย่างอย่างละ 5 รายการลงทุกชีต เพื่อทดสอบแดชบอร์ด — แถวตัวอย่างมีรหัสขึ้นต้นด้วย "SAMPLE-"</div>
+      <button class="btn btn-outline btn-sm" onclick="seedSampleData()"><i class='bx bx-data'></i> เพิ่มข้อมูลตัวอย่าง</button>
+      <button class="btn btn-red btn-sm" onclick="clearSampleData()"><i class='bx bx-trash'></i> ลบข้อมูลตัวอย่างทั้งหมด</button>
+    </div> -->
   </div>
 </div>
 
@@ -1645,7 +1755,7 @@ function closeAllSidebars() {
 ══════════════════════════════════════════════ */
 
 // ★ วาง URL /exec ของคุณที่นี่ (ทางเลือก — หรือตั้งผ่าน UI ก็ได้)
-const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzA8zXOItoPIQPyMvCk-d6d968QzfwhWZTNMPNossbOZzGXUpGQ_zo0x1heFBE8K3miDA/exec';
+const DEFAULT_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbytcrcEwxE8AYCOoCIydOogsxDSYEOjZyXz9oZgsIyjdSzUe4wylcK9VxQg6tjiE8kEhA/exec';
 
 const WEB_APP_URL_STORAGE_KEY = 'NCM_WEB_APP_URL';
 const API_TIMEOUT_MS = 90000;
@@ -1885,7 +1995,7 @@ function updateConnBadge() {
     el.style.background = 'rgba(34,197,94,.25)';
     el.style.color = '#bbf7d0';
   } else if (getWebAppUrl()) {
-    // el.textContent = '● GitHub + /exec';
+    el.textContent = '● GitHub + /exec';
     el.style.background = 'rgba(79,70,229,.3)';
     el.style.color = '#c7d2fe';
   } else {
